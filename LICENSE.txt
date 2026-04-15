@@ -1,0 +1,19 @@
+Sonol Restricted License
+
+Except where a file or embedded notice states otherwise, the Sonol-authored material in this repository is provided under the following terms.
+
+Permission is granted to any recipient to use the software and accompanying documentation for lawful non-commercial purposes.
+
+The following are prohibited without prior written permission from the copyright holder:
+
+1. Modifying, editing, adapting, translating, or otherwise creating derivative works from the software or documentation.
+2. Redistributing, publishing, sharing, sublicensing, or otherwise making the software or documentation available to any third party, in whole or in part.
+3. Commercial use of the software or documentation, including use in paid services, commercial products, revenue-generating workflows, or commercial internal operations.
+4. Resale, relicensing, transfer for value, or other monetized distribution of the software or documentation.
+5. Redistribution of derivative materials, extracted portions, repackaged copies, or incorporated copies.
+
+This software and documentation are provided "as is", without warranty of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, title, and non-infringement.
+
+In no event shall the copyright holder or distributors be liable for any claim, damages, or other liability arising from, out of, or in connection with the software, the documentation, or the use or other dealings in them.
+
+For the avoidance of doubt, bundled third-party dependencies, third-party notices, and files that carry their own license statements remain subject to their respective upstream license terms and are not relicensed by this document.
