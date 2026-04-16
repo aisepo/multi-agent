@@ -1,9 +1,10 @@
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 
 const DEFAULT_LOCK_STALE_MS = 10 * 60_000;
+const CURRENT_HOSTNAME = hostname();
 
 function stableKey(workspaceRoot, requestSummary) {
   const hash = createHash("sha1");
@@ -23,6 +24,7 @@ export function acquirePlannerLock({ workspaceRoot, requestSummary }) {
     lock_key: lockKey,
     workspace_root: workspaceRoot ?? null,
     request_summary: requestSummary ?? "",
+    hostname: CURRENT_HOSTNAME,
     pid: process.pid,
     acquired_at: acquiredAt
   };
@@ -54,6 +56,28 @@ export function acquirePlannerLock({ workspaceRoot, requestSummary }) {
         acquiredAtMs = Date.parse(existingMetadata?.acquired_at ?? "");
       } catch {
         existingMetadata = null;
+      }
+
+      const existingPid = Number.parseInt(String(existingMetadata?.pid ?? ""), 10);
+      const sameHost = !existingMetadata?.hostname || existingMetadata.hostname === CURRENT_HOSTNAME;
+      if (sameHost && Number.isInteger(existingPid) && existingPid > 0) {
+        let pidAlive = null;
+        try {
+          process.kill(existingPid, 0);
+          pidAlive = true;
+        } catch (pidError) {
+          if (pidError && typeof pidError === "object" && "code" in pidError) {
+            if (pidError.code === "ESRCH") {
+              pidAlive = false;
+            } else if (pidError.code === "EPERM") {
+              pidAlive = true;
+            }
+          }
+        }
+        if (pidAlive === false) {
+          rmSync(lockPath, { recursive: true, force: true });
+          continue;
+        }
       }
 
       if (!Number.isFinite(acquiredAtMs)) {

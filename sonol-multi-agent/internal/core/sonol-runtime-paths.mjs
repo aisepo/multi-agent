@@ -20,26 +20,35 @@ function unique(values) {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
+function realpathIfExists(pathname) {
+  if (!existsSync(pathname)) {
+    return null;
+  }
+  try {
+    return realpathSync.native?.(pathname) ?? realpathSync(pathname);
+  } catch {
+    return pathname;
+  }
+}
+
 export function normalizeWorkspacePath(dirPath) {
   const resolved = resolve(dirPath ?? "");
-  const sqliteSafeResolved = /^\/mnt\/[a-zA-Z]\//.test(resolved)
+  const directRealpath = realpathIfExists(resolved);
+  if (directRealpath) {
+    return directRealpath;
+  }
+
+  const lowerMountedPath = /^\/mnt\/[a-zA-Z]\//.test(resolved)
     ? resolved.toLowerCase()
-    : resolved;
-  if (existsSync(sqliteSafeResolved)) {
-    try {
-      return realpathSync.native?.(sqliteSafeResolved) ?? realpathSync(sqliteSafeResolved);
-    } catch {
-      return sqliteSafeResolved;
-    }
+    : null;
+  const loweredRealpath = lowerMountedPath && lowerMountedPath !== resolved
+    ? realpathIfExists(lowerMountedPath)
+    : null;
+  if (loweredRealpath) {
+    return loweredRealpath;
   }
-  if (existsSync(resolved)) {
-    try {
-      return realpathSync.native?.(resolved) ?? realpathSync(resolved);
-    } catch {
-      return resolved;
-    }
-  }
-  return sqliteSafeResolved;
+
+  return resolved;
 }
 
 function workspaceIdentityPath(dirPath) {
@@ -74,13 +83,17 @@ function resolvePositiveInteger(value, fallback) {
 }
 
 function windowsMountCaseVariants(dirPath) {
-  const resolved = normalizeWorkspacePath(dirPath ?? "");
+  const resolved = resolve(dirPath ?? "");
   if (!resolved.startsWith("/mnt/")) {
     return [];
   }
 
   const lower = resolved.toLowerCase();
-  return lower !== resolved ? [lower] : [];
+  const normalized = normalizeWorkspacePath(resolved);
+  return unique([
+    lower !== resolved ? lower : null,
+    normalized !== resolved && normalized !== lower ? normalized : null
+  ]);
 }
 
 function tryWritableDir(dirPath) {

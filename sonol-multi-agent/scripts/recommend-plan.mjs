@@ -229,34 +229,38 @@ if (plannerConfigIssue) {
   });
 }
 
-const plannerLock = acquirePlannerLock({
-  workspaceRoot: binding.workspace_root ?? binding.workspace_id,
-  requestSummary
-});
-if (!plannerLock.ok) {
-  failWithGuidance("PLANNER_REQUEST_IN_PROGRESS", "A planner request for this workspace and request summary is already running.", {
-    workspace_root: args.workspaceRoot,
-    lock_path: plannerLock.lockPath,
-    lock_metadata: plannerLock.metadata ?? null
-  });
-}
-writeDashboardAuthorityArtifacts({
-  binding,
-  dashboardUrl: resolvedDashboardUrl,
-  source: "recommend-plan"
-});
-
+let plannerLock = null;
 let plan = null;
 let deferredGuidance = null;
-const store = args.save
-  ? openStore(binding.db_path, {
-      workspaceRoot: binding.workspace_root ?? args.workspaceRoot,
-      startDir: binding.workspace_root ?? args.workspaceRoot,
-      runtimeRoot: binding.runtime_root
-    })
-  : null;
+let store = null;
 let plannerJob = null;
 try {
+  plannerLock = acquirePlannerLock({
+    workspaceRoot: binding.workspace_root ?? binding.workspace_id,
+    requestSummary
+  });
+  if (!plannerLock.ok) {
+    failWithGuidance("PLANNER_REQUEST_IN_PROGRESS", "A planner request for this workspace and request summary is already running.", {
+      workspace_root: args.workspaceRoot,
+      lock_path: plannerLock.lockPath,
+      lock_metadata: plannerLock.metadata ?? null
+    });
+  }
+
+  writeDashboardAuthorityArtifacts({
+    binding,
+    dashboardUrl: resolvedDashboardUrl,
+    source: "recommend-plan"
+  });
+
+  store = args.save
+    ? openStore(binding.db_path, {
+        workspaceRoot: binding.workspace_root ?? args.workspaceRoot,
+        startDir: binding.workspace_root ?? args.workspaceRoot,
+        runtimeRoot: binding.runtime_root
+      })
+    : null;
+
   if (store) {
     store.upsertWorkspaceRegistry?.({
       workspace_id: binding.workspace_id,
@@ -344,7 +348,7 @@ try {
   }
 } finally {
   store?.close();
-  plannerLock.release?.();
+  plannerLock?.release?.();
 }
 
 if (deferredGuidance) {

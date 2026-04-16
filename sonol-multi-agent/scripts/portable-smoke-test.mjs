@@ -72,9 +72,9 @@ pushCheck(
     : `Workspace-local runtime root not present at ${expectedWorkspaceRuntimeRoot}; use --workspace-root or SONOL_WORKSPACE_ROOT if you expected workspace-local binding.`
 );
 pushCheck(
-  "sqlite_safe_mnt_path",
-  !/^\/mnt\/[A-Z]/.test(result.resolved_db_path),
-  "Resolved DB path should use SQLite-safe lowercase /mnt casing on WSL-style mounts."
+  "filesystem_mnt_path_preserved",
+  !expectedWorkspaceDbPath.startsWith("/mnt/") || result.resolved_db_path === expectedWorkspaceDbPath,
+  "Resolved DB path should preserve the active workspace filesystem path on WSL-style mounts."
 );
 
 process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

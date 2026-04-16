@@ -119,7 +119,7 @@ export function resolveSonolBinding(options = {}) {
     && (!workspaceRoot || !registryWorkspaceRoot || registryWorkspaceRoot === normalizeWorkspacePath(workspaceRoot))
   );
 
-  if (!explicitWorkspaceRoot && !envWorkspaceRoot && registryWorkspaceRoot && registryMatchesWorkspace) {
+  if (!explicitWorkspaceRoot && !envWorkspaceRoot && !workspaceRoot && registryWorkspaceRoot && registryMatchesWorkspace) {
     workspaceRoot = registryWorkspaceRoot;
     source.workspace_root = "registry";
   }
@@ -132,21 +132,21 @@ export function resolveSonolBinding(options = {}) {
       };
   const allowRegistryPreferredPaths = !explicitWorkspaceRoot && !envWorkspaceRoot && !explicitDbPath && !envDbPath && !explicitRuntimeRoot && !envRuntimeRoot;
 
-  const dbPath = explicitDbPath
+  const dbPath = normalizeWorkspacePath(explicitDbPath
     ?? envDbPath
     ?? (allowRegistryPreferredPaths && registryMatchesWorkspace && registryPathIsUsable(registry?.preferred_db_path) ? registry?.preferred_db_path : null)
-    ?? defaultDbPath({ workspaceRoot: finalWorkspace.workspace_root ?? workspaceRoot ?? startDir, startDir: finalWorkspace.workspace_root ?? startDir });
+    ?? defaultDbPath({ workspaceRoot: finalWorkspace.workspace_root ?? workspaceRoot ?? startDir, startDir: finalWorkspace.workspace_root ?? startDir }));
   if (allowRegistryPreferredPaths && registryMatchesWorkspace && registryPathIsUsable(registry?.preferred_db_path)) {
     source.db_path = "registry";
   }
 
-  const runtimeRoot = explicitRuntimeRoot
+  const runtimeRoot = normalizeWorkspacePath(explicitRuntimeRoot
     ?? envRuntimeRoot
     ?? (allowRegistryPreferredPaths && registryMatchesWorkspace && registryPathIsUsable(registry?.preferred_runtime_root) ? registry?.preferred_runtime_root : null)
     ?? defaultRuntimeRoot({
       workspaceRoot: finalWorkspace.workspace_root ?? workspaceRoot ?? startDir,
       startDir: finalWorkspace.workspace_root ?? startDir
-    });
+    }));
   if (explicitRuntimeRoot) {
     source.runtime_root = "flag";
   } else if (envRuntimeRoot) {

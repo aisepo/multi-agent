@@ -10,6 +10,7 @@ import {
   defaultDbPath as resolveDefaultDbPath,
   defaultRuntimeRoot as resolveDefaultRuntimeRoot,
   detectWorkspaceRoot,
+  normalizeWorkspacePath,
   workspaceContextForDbPath,
   workspaceScopeId
 } from "./sonol-runtime-paths.mjs";
@@ -125,12 +126,7 @@ function normalizeText(value, fallback = "") {
 }
 
 function sqlitePathFallbacks(dbPath) {
-  const resolved = resolve(dbPath ?? "");
-  if (!/^\/mnt\/[A-Za-z]\//.test(resolved)) {
-    return [resolved];
-  }
-  const lower = resolved.toLowerCase();
-  return lower === resolved ? [resolved] : [resolved, lower];
+  return [normalizeWorkspacePath(dbPath ?? "")];
 }
 
 function isNonEmptyString(value) {
