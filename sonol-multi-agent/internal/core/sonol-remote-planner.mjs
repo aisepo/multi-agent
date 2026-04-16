@@ -2,6 +2,10 @@ import { createHash, randomUUID } from "node:crypto";
 import { basename, resolve } from "node:path";
 import { getWorkspaceContext } from "./sonol-runtime-paths.mjs";
 import { inferAdapterConfigForWorkspace } from "./sonol-provider-session.mjs";
+import {
+  DEFAULT_PUBLIC_REMOTE_PLANNER_URL,
+  deriveRemotePlannerTicketUrlFromPlannerUrl
+} from "./sonol-public-remote-config.mjs";
 
 const DEFAULT_REMOTE_TIMEOUT_MS = 30000;
 const DEFAULT_REMOTE_CLIENT_NAME = "sonol-community-edition";
@@ -170,24 +174,30 @@ export function resolveRemotePlannerConfig(options = {}) {
     ?? env.SONOL_REMOTE_PLAN_NORMALIZER_SEND_WORKSPACE_ROOT
     ?? env.SONOL_REMOTE_PLANNER_SEND_WORKSPACE_ROOT
   );
+  const rawPlannerUrl = normalizeText(
+    options.remotePlannerUrl
+    ?? options.remoteNormalizerUrl
+    ?? env.SONOL_REMOTE_PLAN_NORMALIZER_URL
+    ?? env.SONOL_REMOTE_PLANNER_URL
+    ?? env.SONOL_REMOTE_CONTROL_PLANE_URL
+  );
   const plannerUrl = validateRemoteUrl(
     "SONOL_REMOTE_PLAN_NORMALIZER_URL",
-    options.remotePlannerUrl
-      ?? options.remoteNormalizerUrl
-      ?? env.SONOL_REMOTE_PLAN_NORMALIZER_URL
-      ?? env.SONOL_REMOTE_PLANNER_URL
-      ?? env.SONOL_REMOTE_CONTROL_PLANE_URL,
+    rawPlannerUrl || DEFAULT_PUBLIC_REMOTE_PLANNER_URL,
     {
       bearerToken,
       sendWorkspaceRoot
     }
   );
+  const rawTicketUrl = normalizeText(
+    options.remotePlannerTicketUrl
+    ?? options.remoteNormalizerTicketUrl
+    ?? env.SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL
+    ?? env.SONOL_REMOTE_PLANNER_TICKET_URL
+  );
   const ticketUrl = validateRemoteUrl(
     "SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL",
-    options.remotePlannerTicketUrl
-      ?? options.remoteNormalizerTicketUrl
-      ?? env.SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL
-      ?? env.SONOL_REMOTE_PLANNER_TICKET_URL,
+    rawTicketUrl || deriveRemotePlannerTicketUrlFromPlannerUrl(plannerUrl),
     {
       bearerToken,
       sendWorkspaceRoot

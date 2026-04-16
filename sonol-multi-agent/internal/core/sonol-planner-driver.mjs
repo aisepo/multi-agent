@@ -1,3 +1,10 @@
+import {
+  DEFAULT_PUBLIC_REMOTE_PLANNER_URL,
+  DEFAULT_PUBLIC_REMOTE_PLANNER_TICKET_URL_SOURCE,
+  DEFAULT_PUBLIC_REMOTE_PLANNER_URL_SOURCE,
+  deriveRemotePlannerTicketUrlFromPlannerUrl
+} from "./sonol-public-remote-config.mjs";
+
 export const REMOTE_PLANNER_BACKEND = "remote_control_plane";
 export const REMOTE_PLANNER_DRIVER = "remote_http";
 export const SONOL_PLANNER_BACKEND = REMOTE_PLANNER_BACKEND;
@@ -50,7 +57,7 @@ export function resolvePlannerConfig(options = {}) {
     ?? env.SONOL_PLANNER_DRIVER,
     ""
   );
-  const remotePlannerUrl = normalizeText(
+  const rawRemotePlannerUrl = normalizeText(
     options.remotePlannerUrl
     ?? options.remoteNormalizerUrl
     ?? env.SONOL_REMOTE_PLAN_NORMALIZER_URL
@@ -58,13 +65,15 @@ export function resolvePlannerConfig(options = {}) {
     ?? env.SONOL_REMOTE_CONTROL_PLANE_URL,
     ""
   );
-  const remotePlannerTicketUrl = normalizeText(
+  const remotePlannerUrl = rawRemotePlannerUrl || DEFAULT_PUBLIC_REMOTE_PLANNER_URL;
+  const rawRemotePlannerTicketUrl = normalizeText(
     options.remotePlannerTicketUrl
     ?? options.remoteNormalizerTicketUrl
     ?? env.SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL
     ?? env.SONOL_REMOTE_PLANNER_TICKET_URL,
     ""
   );
+  const remotePlannerTicketUrl = rawRemotePlannerTicketUrl || deriveRemotePlannerTicketUrlFromPlannerUrl(remotePlannerUrl);
   const remotePlannerBearerToken = normalizeText(
     options.remotePlannerBearerToken
     ?? options.remoteNormalizerBearerToken
@@ -82,12 +91,16 @@ export function resolvePlannerConfig(options = {}) {
   const remoteConfigPresentKeys = [];
   if (remotePlannerUrl) {
     remoteConfigPresentKeys.push(
-      env.SONOL_REMOTE_PLAN_NORMALIZER_URL ? "SONOL_REMOTE_PLAN_NORMALIZER_URL" : "SONOL_REMOTE_PLANNER_URL"
+      rawRemotePlannerUrl
+        ? (env.SONOL_REMOTE_PLAN_NORMALIZER_URL ? "SONOL_REMOTE_PLAN_NORMALIZER_URL" : "SONOL_REMOTE_PLANNER_URL")
+        : DEFAULT_PUBLIC_REMOTE_PLANNER_URL_SOURCE
     );
   }
   if (remotePlannerTicketUrl) {
     remoteConfigPresentKeys.push(
-      env.SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL ? "SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL" : "SONOL_REMOTE_PLANNER_TICKET_URL"
+      rawRemotePlannerTicketUrl
+        ? (env.SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL ? "SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL" : "SONOL_REMOTE_PLANNER_TICKET_URL")
+        : DEFAULT_PUBLIC_REMOTE_PLANNER_TICKET_URL_SOURCE
     );
   }
   if (remotePlannerBearerToken) {
@@ -108,9 +121,6 @@ export function resolvePlannerConfig(options = {}) {
   if (!remotePlannerAllowUnsigned && !remotePlannerTicketUrl) {
     remoteConfigMissingKeys.push("SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL");
   }
-  if (!remotePlannerAllowUnsigned && !remotePlannerBearerToken) {
-    remoteConfigMissingKeys.push("SONOL_REMOTE_PLAN_NORMALIZER_BEARER_TOKEN");
-  }
 
   const remoteConfigDetected = remoteConfigPresentKeys.length > 0;
   const remoteConfigComplete = remoteConfigMissingKeys.length === 0;
@@ -120,7 +130,7 @@ export function resolvePlannerConfig(options = {}) {
 
   let remoteConfigErrorReason = null;
   if (!remoteConfigDetected) {
-    remoteConfigErrorReason = "Public/community edition requires a hosted plan normalizer. Set SONOL_PLANNER_DRIVER=remote_http together with SONOL_REMOTE_PLAN_NORMALIZER_URL, SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL, and SONOL_REMOTE_PLAN_NORMALIZER_BEARER_TOKEN.";
+    remoteConfigErrorReason = "Public/community edition requires a hosted plan normalizer. The built-in public endpoint could not be resolved, so set SONOL_REMOTE_PLAN_NORMALIZER_URL and SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL explicitly.";
   } else if (!remoteConfigComplete) {
     remoteConfigErrorReason = `Hosted plan normalizer configuration is incomplete. Missing: ${remoteConfigMissingKeys.join(", ")}.`;
   }

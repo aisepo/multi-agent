@@ -236,12 +236,18 @@ split explicit:
 
 Recommended hosted normalization environment:
 
-- `SONOL_PLANNER_DRIVER=remote_http`
-- `SONOL_REMOTE_PLAN_NORMALIZER_URL=https://your-planner.example/v1/planner/draft`
-- `SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL=https://your-planner.example/v1/planner/ticket`
-- `SONOL_REMOTE_PLAN_NORMALIZER_BEARER_TOKEN=<token>`
-- `SONOL_REMOTE_DASHBOARD_BASE_URL=https://your-planner.example/sonol-dashboard/`
-  - optional: if omitted, Sonol derives `/sonol-dashboard/` from the hosted planner origin
+- Standard public/community install:
+  - no planner env vars are required
+  - Sonol defaults to `https://agent.zooo.kr/v1/planner/draft`
+  - Sonol defaults to `https://agent.zooo.kr/v1/planner/ticket`
+  - Sonol defaults to `https://agent.zooo.kr/sonol-dashboard/`
+- Optional private or self-hosted override:
+  - `SONOL_PLANNER_DRIVER=remote_http`
+  - `SONOL_REMOTE_PLAN_NORMALIZER_URL=https://your-planner.example/v1/planner/draft`
+  - `SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL=https://your-planner.example/v1/planner/ticket`
+  - `SONOL_REMOTE_PLAN_NORMALIZER_BEARER_TOKEN=<token>`
+  - `SONOL_REMOTE_DASHBOARD_BASE_URL=https://your-planner.example/sonol-dashboard/`
+    - optional: if omitted, Sonol derives `/sonol-dashboard/` from the hosted planner origin
 
 In this mode:
 
@@ -253,7 +259,7 @@ In this mode:
 - browser UI preferences may exist, but they must stay non-authoritative
 - path-sensitive local values such as `authoritative_db_path` must not be treated as remote service inputs by default
 - the public/community edition does not ship the private normalization/binding core
-- if the remote normalization environment variables are absent or incomplete, Sonol fails fast instead of generating a local fallback draft
+- if a custom remote normalization override is incomplete, Sonol fails fast instead of generating a local fallback draft
 - remote normalization should be enabled per shell or per project, not forced globally in every terminal profile
 
 ## Hard Rules
@@ -316,8 +322,9 @@ In this mode:
 - Recommend and save a plan:
   - `node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/recommend-plan.mjs --creative-draft-file /abs/draft.json --request-summary "request summary"`
   - Optional workspace override: `node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/recommend-plan.mjs --creative-draft-file /abs/draft.json --workspace-root /abs/workspace --db /abs/sonol.sqlite --request-summary "request summary"`
-  - Hosted normalizer: `SONOL_PLANNER_DRIVER=remote_http SONOL_REMOTE_PLAN_NORMALIZER_URL=https://your-planner.example/v1/planner/draft SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL=https://your-planner.example/v1/planner/ticket SONOL_REMOTE_PLAN_NORMALIZER_BEARER_TOKEN=<token> node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/recommend-plan.mjs --creative-draft-file /abs/draft.json --workspace-root /abs/workspace --db /abs/sonol.sqlite --request-summary "request summary"`
-  - Without a compatible hosted normalizer, plan recommendation fails fast instead of running a bundled local planner core or generating a local fallback draft.
+  - Public hosted normalizer default: `node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/recommend-plan.mjs --creative-draft-file /abs/draft.json --workspace-root /abs/workspace --db /abs/sonol.sqlite --request-summary "request summary"`
+  - Private/self-hosted override: `SONOL_PLANNER_DRIVER=remote_http SONOL_REMOTE_PLAN_NORMALIZER_URL=https://your-planner.example/v1/planner/draft SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL=https://your-planner.example/v1/planner/ticket SONOL_REMOTE_PLAN_NORMALIZER_BEARER_TOKEN=<token> node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/recommend-plan.mjs --creative-draft-file /abs/draft.json --workspace-root /abs/workspace --db /abs/sonol.sqlite --request-summary "request summary"`
+  - Without a compatible hosted normalizer or the built-in public endpoint, plan recommendation fails fast instead of running a bundled local planner core or generating a local fallback draft.
 - Present the user-facing proposal:
   - `node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/present-proposal.mjs --creative-draft-file /abs/draft.json --request-summary "request summary"`
   - Optional workspace override: `node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/present-proposal.mjs --creative-draft-file /abs/draft.json --workspace-root /abs/workspace --db /abs/sonol.sqlite --request-summary "request summary"`

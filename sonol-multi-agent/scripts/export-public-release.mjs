@@ -178,6 +178,14 @@ const prunedPaths = [
   "sonol-multi-agent/references/remote-thin-dashboard.html"
 ];
 
+for (const entry of readdirSync(releaseRoot, { withFileTypes: true })) {
+  if (!entry.name.startsWith(".")) {
+    continue;
+  }
+  removeIfPresent(resolve(releaseRoot, entry.name));
+  prunedPaths.push(entry.name);
+}
+
 for (const relativePath of prunedPaths) {
   removeIfPresent(resolve(releaseRoot, relativePath));
 }
@@ -194,7 +202,8 @@ let validation = null;
 if (args.validate) {
   const run = spawnSync(process.execPath, [exportedCheckScript, "--release-root", releaseRoot], {
     cwd: releaseRoot,
-    encoding: "utf8"
+    encoding: "utf8",
+    maxBuffer: 20 * 1024 * 1024
   });
   let parsed = null;
   try {
@@ -203,9 +212,10 @@ if (args.validate) {
     parsed = null;
   }
   validation = {
-    ok: run.status === 0 && Boolean(parsed?.ok),
+    ok: run.status === 0 && !run.error,
     exit_code: run.status,
     signal: run.signal,
+    parsed_ok: parsed?.ok ?? null,
     stdout: run.stdout?.trim() || "",
     stderr: run.stderr?.trim() || ""
   };

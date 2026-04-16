@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { resolve } from "node:path";
 import { getWorkspaceContext } from "./sonol-runtime-paths.mjs";
 import { resolveSonolBinding } from "./sonol-binding-resolver.mjs";
+import { deriveRemoteDashboardBaseUrlFromPlannerUrl } from "./sonol-public-remote-config.mjs";
 
 function normalizeText(value, fallback = "") {
   const text = String(value ?? "").trim();
@@ -25,14 +26,7 @@ function deriveDashboardBaseUrlFromPlannerEnv(env) {
     ?? env.SONOL_REMOTE_CONTROL_PLANE_URL
     ?? ""
   );
-  if (!plannerUrl) {
-    return "";
-  }
-  try {
-    return new URL("/sonol-dashboard/", new URL(plannerUrl).origin).toString();
-  } catch {
-    return "";
-  }
+  return deriveRemoteDashboardBaseUrlFromPlannerUrl(plannerUrl);
 }
 
 function persistedRemoteDashboardBaseUrl(options = {}) {

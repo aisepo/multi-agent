@@ -80,7 +80,20 @@ function walkFiles(rootDir, relativeDir = "") {
   return files;
 }
 
-const visibleTopLevelEntries = readdirSync(args.releaseRoot, { withFileTypes: true })
+const allTopLevelEntries = readdirSync(args.releaseRoot, { withFileTypes: true });
+const hiddenTopLevelEntries = allTopLevelEntries
+  .filter((entry) => entry.name.startsWith("."))
+  .map((entry) => entry.name)
+  .sort();
+pushCheck(
+  "hidden_top_level_entries",
+  hiddenTopLevelEntries.length === 0,
+  hiddenTopLevelEntries.length === 0
+    ? "No hidden top-level entries detected in the public release root."
+    : `Hidden top-level entries must be absent from the public release root. Found: ${hiddenTopLevelEntries.join(", ")}`
+);
+
+const visibleTopLevelEntries = allTopLevelEntries
   .filter((entry) => !entry.name.startsWith("."))
   .map((entry) => ({ name: entry.name, isDirectory: entry.isDirectory() }));
 const visibleTopLevelNames = visibleTopLevelEntries.map((entry) => entry.name).sort();
@@ -145,19 +158,50 @@ for (const suffix of forbiddenSuffixes) {
   );
 }
 
-const textFilesToScan = [
-  "sonol-multi-agent/SKILL.md",
-  "sonol-multi-agent/references/agent-shaping.md",
-  "sonol-multi-agent/references/public-release.md",
-  "sonol-multi-agent/references/portable-setup.md",
-  "sonol-agent-runtime/SKILL.md"
-];
 const forbiddenTextMarkers = [
   "references/remote-control-plane.env.example",
   "references/sonol-remote-control-plane.service",
   "references/remote-thin-dashboard.html",
-  "hosted private planner"
+  "hosted private planner",
+  "/mnt/e/CLAUDE_PROJECT/",
+  "/mnt/e/claude_project/",
+  "/root/.codex/skills/sonol-multi-agent",
+  "/root/.codex/skills/sonol-agent-runtime",
+  "/root/.agents/skills/",
+  "/mnt/e/CLAUDE_PROJECT/MULTIAGENT_SKILL/"
 ];
+
+function shouldScanTextFile(relativePath) {
+  if (
+    relativePath === "sonol-multi-agent/scripts/check-public-release.mjs"
+    || relativePath === "sonol-multi-agent/scripts/export-public-release.mjs"
+  ) {
+    return false;
+  }
+  if (relativePath.startsWith("sonol-multi-agent/node_modules/")) {
+    return false;
+  }
+  if (relativePath.startsWith("sonol-agent-runtime/node_modules/")) {
+    return false;
+  }
+  if (relativePath.startsWith("sonol-multi-agent/internal/dashboard/dist/")) {
+    return false;
+  }
+  return [
+    ".md",
+    ".txt",
+    ".json",
+    ".mjs",
+    ".js",
+    ".cjs",
+    ".yml",
+    ".yaml",
+    ".service",
+    ".env.example"
+  ].some((suffix) => relativePath.endsWith(suffix));
+}
+
+const textFilesToScan = allFiles.filter((relativePath) => shouldScanTextFile(relativePath));
 
 for (const relativePath of textFilesToScan) {
   const absolutePath = resolve(args.releaseRoot, relativePath);
