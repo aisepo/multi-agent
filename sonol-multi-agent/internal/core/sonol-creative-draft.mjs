@@ -6,6 +6,12 @@ import Ajv2020 from "ajv/dist/2020.js";
 const CREATIVE_DRAFT_SCHEMA_PATH = fileURLToPath(
   new URL("../schemas/creative-draft.schema.json", import.meta.url)
 );
+const CREATIVE_DRAFT_EXAMPLE_KO_PATH = fileURLToPath(
+  new URL("../../references/creative-draft.example.ko.json", import.meta.url)
+);
+const CREATIVE_DRAFT_EXAMPLE_EN_PATH = fileURLToPath(
+  new URL("../../references/creative-draft.example.en.json", import.meta.url)
+);
 const creativeDraftSchema = JSON.parse(readFileSync(CREATIVE_DRAFT_SCHEMA_PATH, "utf8"));
 const creativeDraftAjv = new Ajv2020({ allErrors: true, strict: false });
 const validateCreativeDraftShape = creativeDraftAjv.compile(creativeDraftSchema);
@@ -69,10 +75,47 @@ export function creativeDraftGuidance() {
     ],
     rules: [
       "The local Codex/Claude side must create the creative draft before present-proposal or recommend-plan.",
-      "The creative draft is the local AI-authored proposal for agent count, roles, order, and constraints.",
+      "The creative draft is the local AI-authored proposal for orchestration shape, not the persisted normalized plan record.",
+      "Use the canonical root fields plan_title, preferred_language, single_or_multi, multi_agent_beneficial, recommendation_summary, recommendation_reasons, and subagents.",
+      "Each creative draft subagent uses slot_id and role_label. Do not author the draft with normalized plan fields such as agent_id, role, workstream_id, assigned_task_ids, or reporting_contract.",
+      "Main agent is implicit and mandatory in runtime orchestration, but it is not listed inside the creative draft subagents array.",
       "The hosted remote service is only allowed to normalize, validate, and bind execution. It must not author the initial draft for the public/community edition."
     ],
-    schema_path: CREATIVE_DRAFT_SCHEMA_PATH
+    schema_path: CREATIVE_DRAFT_SCHEMA_PATH,
+    example_files: {
+      ko: CREATIVE_DRAFT_EXAMPLE_KO_PATH,
+      en: CREATIVE_DRAFT_EXAMPLE_EN_PATH
+    },
+    canonical_root_fields: [
+      "plan_title",
+      "preferred_language",
+      "single_or_multi",
+      "multi_agent_beneficial",
+      "recommendation_summary",
+      "recommendation_reasons",
+      "subagents"
+    ],
+    canonical_subagent_fields: [
+      "slot_id",
+      "role_label",
+      "execution_class",
+      "purpose",
+      "task_title",
+      "selection_rationale",
+      "provider_agent_type",
+      "developer_instructions",
+      "model",
+      "model_reasoning_effort",
+      "sandbox_mode",
+      "mcp_servers",
+      "skills_config",
+      "nickname_candidates",
+      "read_paths",
+      "write_paths",
+      "deny_paths",
+      "operational_constraints",
+      "depends_on"
+    ]
   };
 }
 

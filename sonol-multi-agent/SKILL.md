@@ -37,6 +37,17 @@ wants orchestration.
    create the creative draft and pass it into the command. A compatible hosted
    service then normalizes, validates, and binds that draft. It must not author
    the initial creative structure.
+   Before writing the draft, open the canonical contract at
+   `references/creative-draft-contract.md`
+   and one of the checked-in examples:
+   `references/creative-draft.example.ko.json`
+   or
+   `references/creative-draft.example.en.json`.
+   The creative draft uses `subagents`, `slot_id`, and `role_label`. Do not
+   author it with normalized plan fields such as `agent_id`, `role`,
+   `workstream_id`, or `reporting_contract`.
+   The Main agent is implicit and must not be written into the draft
+   `subagents` array.
    Always pass the request with `--request-summary "..."`. Do not rely on
    positional text.
    At this stage, also generate a short `plan title` for dashboard display.
@@ -262,6 +273,31 @@ In this mode:
 - if a custom remote normalization override is incomplete, Sonol fails fast instead of generating a local fallback draft
 - remote normalization should be enabled per shell or per project, not forced globally in every terminal profile
 
+## Creative Draft Contract
+
+- The creative draft is the local input contract. It is not the persisted
+  normalized plan object.
+- Required root fields are:
+  `plan_title`, `preferred_language`, `single_or_multi`,
+  `multi_agent_beneficial`, `recommendation_summary`,
+  `recommendation_reasons`, and `subagents`.
+- Each creative draft subagent must use:
+  `slot_id`, `role_label`, `execution_class`, `purpose`, `task_title`,
+  `selection_rationale`, `provider_agent_type`, `developer_instructions`,
+  `model`, `model_reasoning_effort`, `sandbox_mode`, `mcp_servers`,
+  `skills_config`, `nickname_candidates`, `read_paths`, `write_paths`,
+  `deny_paths`, `operational_constraints`, and `depends_on`.
+- Main agent semantics are runtime policy and remain implicit. Do not put Main
+  into `subagents`.
+- Use the canonical contract doc:
+  `references/creative-draft-contract.md`
+- Use the checked-in examples before authoring a new draft:
+  `references/creative-draft.example.ko.json`
+  and
+  `references/creative-draft.example.en.json`
+- The CLI now validates the creative draft before planner locks, pending
+  workspace state, or planner job rows are created.
+
 ## Hard Rules
 
 - Main Agent always exists and owns final integration.
@@ -330,6 +366,9 @@ In this mode:
   - Optional workspace override: `node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/present-proposal.mjs --creative-draft-file /abs/draft.json --workspace-root /abs/workspace --db /abs/sonol.sqlite --request-summary "request summary"`
   - Optional dashboard bridge override: `node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/present-proposal.mjs --creative-draft-file /abs/draft.json --workspace-root /abs/workspace --db /abs/sonol.sqlite --dashboard-url http://127.0.0.1:18081 --request-summary "request summary"`
   - Force planner driver only when debugging: `SONOL_PLANNER_DRIVER=remote_http`
+  - If the draft is invalid, Sonol fails before planner lock and DB mutation.
+    Fix the draft against `references/creative-draft-contract.md`
+    or the checked-in examples, then retry.
 - Internal terminal confirmation helper used after the user types `승인`:
   - `node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/confirm-plan.mjs --workspace-root /abs/workspace`
   - Claude Code override: `node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/confirm-plan.mjs --workspace-root /abs/workspace --adapter-type claude-code-subagent --adapter-backend claude-code-manual`

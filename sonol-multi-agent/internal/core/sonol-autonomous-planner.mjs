@@ -154,7 +154,7 @@ export async function recommendPlanAutonomous(requestSummary, options = {}) {
     throw new Error(`public/community edition requires ${REMOTE_PLANNER_DRIVER}`);
   }
 
-  const { draft: creativeDraft } = loadCreativeDraft(options);
+  const creativeDraft = options.creativeDraft ?? loadCreativeDraft(options).draft;
   const remotePlan = await requestRemotePlannerDraft(requestSummary, {
     ...options,
     creativeDraft,

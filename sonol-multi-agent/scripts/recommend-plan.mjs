@@ -6,7 +6,7 @@ import { openStore } from "../internal/core/sonol-store.mjs";
 import { resolveSonolBinding } from "../internal/core/sonol-binding-resolver.mjs";
 import { acquirePlannerLock } from "../internal/core/sonol-planner-lock.mjs";
 import { resolvePlannerConfig, summarizePlannerConfig, validatePlannerConfig } from "../internal/core/sonol-planner-driver.mjs";
-import { creativeDraftGuidance } from "../internal/core/sonol-creative-draft.mjs";
+import { creativeDraftGuidance, loadCreativeDraft } from "../internal/core/sonol-creative-draft.mjs";
 import { ensureDashboardBridgeToken, operatorDashboardUrlForWorkspace } from "../internal/core/sonol-dashboard-bridge.mjs";
 import { dashboardUrlForWorkspace } from "../internal/core/sonol-runtime-paths.mjs";
 import { validateRequestSummaryInput } from "../internal/core/sonol-validation.mjs";
@@ -41,8 +41,8 @@ function buildGuidance(errorCode, message, extra = {}) {
     error_code: errorCode,
     message,
     expected_usage: [
-      "node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/recommend-plan.mjs --request-summary \"request summary\"",
       "node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/recommend-plan.mjs --creative-draft-file /abs/draft.json --workspace-root /abs/workspace --request-summary \"request summary\"",
+      "node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/recommend-plan.mjs --creative-draft-json '{\"plan_title\":\"Short title\",\"preferred_language\":\"ko\",\"single_or_multi\":\"multi\",\"multi_agent_beneficial\":true,\"recommendation_summary\":\"...\",\"recommendation_reasons\":[\"...\"],\"subagents\":[...]}' --request-summary \"request summary\"",
       "node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/recommend-plan.mjs --creative-draft-file /abs/draft.json --language ko --workspace-root /abs/workspace --db /path/to/sonol.sqlite --timeout-ms 180000 --request-summary \"request summary\"",
       "node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/recommend-plan.mjs --creative-draft-file /abs/draft.json --workspace-root /abs/workspace --db /path/to/sonol.sqlite --dashboard-url http://127.0.0.1:18081 --request-summary \"request summary\""
     ],
@@ -55,6 +55,7 @@ function buildGuidance(errorCode, message, extra = {}) {
       "Set SONOL_REMOTE_PLAN_NORMALIZER_URL and SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL only when overriding the default hosted planner",
       "SONOL_REMOTE_PLAN_NORMALIZER_BEARER_TOKEN is optional and is only needed for restricted private deployments",
       "The local Codex/Claude side must author the creative draft. The hosted service only normalizes, validates, and binds execution.",
+      "Before authoring a draft, open the creative draft schema or the checked-in example files.",
       "Positional request text is not allowed",
       "Do not pass flag-looking text as the request summary",
       "Use a non-empty natural-language request summary"
@@ -63,9 +64,8 @@ function buildGuidance(errorCode, message, extra = {}) {
   };
 }
 
-function failWithGuidance(errorCode, message, extra = {}) {
-  const guidance = buildGuidance(errorCode, message, extra);
-  console.error(message);
+function printGuidance(guidance) {
+  console.error(guidance.message);
   console.error("");
   console.error("Expected format:");
   for (const line of guidance.expected_usage) {
@@ -73,7 +73,20 @@ function failWithGuidance(errorCode, message, extra = {}) {
   }
   console.error("");
   console.error(JSON.stringify(guidance, null, 2));
+}
+
+function failWithGuidance(errorCode, message, extra = {}) {
+  const guidance = buildGuidance(errorCode, message, extra);
+  printGuidance(guidance);
   process.exit(1);
+}
+
+class GuidanceSignal extends Error {
+  constructor(guidance) {
+    super(guidance?.message ?? "guidance required");
+    this.name = "GuidanceSignal";
+    this.guidance = guidance;
+  }
 }
 
 for (let index = 2; index < process.argv.length; index += 1) {
@@ -157,6 +170,18 @@ if (!requestSummaryValidation.ok) {
   });
 }
 const requestSummary = requestSummaryValidation.normalized;
+let creativeDraft = null;
+try {
+  ({ draft: creativeDraft } = loadCreativeDraft(args));
+} catch (error) {
+  if (error?.code === "CREATIVE_DRAFT_REQUIRED" || error?.code === "CREATIVE_DRAFT_INVALID") {
+    failWithGuidance(error.code, error.message, {
+      creative_draft: creativeDraftGuidance(),
+      validation_errors: error.validation_errors ?? []
+    });
+  }
+  throw error;
+}
 const binding = resolveSonolBinding({
   workspaceRoot: args.workspaceRoot,
   dbPath: args.dbPath,
@@ -205,6 +230,7 @@ if (!plannerLock.ok) {
 }
 
 let plan = null;
+let deferredGuidance = null;
 const store = args.save
   ? openStore(binding.db_path, {
       workspaceRoot: binding.workspace_root ?? args.workspaceRoot,
@@ -225,12 +251,15 @@ try {
     });
     const planningClaim = store.claimPlanningRequest(requestSummary);
     if (!planningClaim?.ok) {
-      plannerLock.release?.();
-      failWithGuidance(planningClaim.code, planningClaim.code === "DUPLICATE_PENDING_REQUEST"
-        ? "The same planning request is already in progress."
-        : "Another planning request is already in progress for this workspace.", {
-        pending_request_summary: planningClaim.pending_request_summary ?? null
-      });
+      throw new GuidanceSignal(buildGuidance(
+        planningClaim.code,
+        planningClaim.code === "DUPLICATE_PENDING_REQUEST"
+          ? "The same planning request is already in progress."
+          : "Another planning request is already in progress for this workspace.",
+        {
+          pending_request_summary: planningClaim.pending_request_summary ?? null
+        }
+      ));
     }
     plannerJob = store.createPlannerJob({
       workspace_id: binding.workspace_id,
@@ -259,6 +288,7 @@ try {
     workspaceRoot: binding.workspace_root ?? args.workspaceRoot,
     timeoutMs: args.timeoutMs,
     plannerDriver: plannerConfig.planner_driver,
+    creativeDraft,
     creativeDraftFile: args.creativeDraftFile,
     creativeDraftBase64: args.creativeDraftBase64,
     creativeDraftJson: args.creativeDraftJson
@@ -281,25 +311,28 @@ try {
     });
   }
 } catch (error) {
-  if (error?.code === "CREATIVE_DRAFT_REQUIRED" || error?.code === "CREATIVE_DRAFT_INVALID") {
-    failWithGuidance(error.code, error.message, {
-      creative_draft: creativeDraftGuidance(),
-      validation_errors: error.validation_errors ?? []
-    });
-  }
-  if (store) {
-    store.failPlanningRequest(error instanceof Error ? error.message : String(error));
-    if (plannerJob?.job_id) {
-      store.failPlannerJob(plannerJob.job_id, {
-        error_code: "PLANNER_FAILED",
-        error_message: error instanceof Error ? error.message : String(error)
-      });
+  if (error instanceof GuidanceSignal) {
+    deferredGuidance = error.guidance;
+  } else {
+    if (store) {
+      store.failPlanningRequest(error instanceof Error ? error.message : String(error));
+      if (plannerJob?.job_id) {
+        store.failPlannerJob(plannerJob.job_id, {
+          error_code: "PLANNER_FAILED",
+          error_message: error instanceof Error ? error.message : String(error)
+        });
+      }
     }
+    throw error;
   }
-  throw error;
 } finally {
   store?.close();
   plannerLock.release?.();
+}
+
+if (deferredGuidance) {
+  printGuidance(deferredGuidance);
+  process.exit(1);
 }
 
 process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);

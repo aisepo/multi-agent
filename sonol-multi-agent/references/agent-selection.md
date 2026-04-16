@@ -5,7 +5,7 @@ Use these rules when deciding the agent set.
 ## Fixed rules
 
 - Total agents: `1..6`
-- Main agent: always `1`
+- Main agent: always `1`, but implicit in the creative draft
 - Sub-agents: `0..5`
 - Effective concurrency must stay within the lower of Sonol policy, Codex
   `agents.max_threads`, and any operator override.
@@ -21,6 +21,20 @@ Use these rules when deciding the agent set.
 - Duplicate roles are allowed.
 - `execution_class` is the stable internal routing field.
 - `role_label` is the user-facing display name.
+
+## Creative draft versus normalized plan
+
+- The local creative draft is an input contract, not the saved normalized plan.
+- Author the creative draft with the contract in
+  `references/creative-draft-contract.md`.
+- In the creative draft, the array key is `subagents`.
+- In the creative draft, each subagent uses `slot_id` and `role_label`.
+- Main agent policy is implicit and does not appear inside creative draft
+  `subagents`.
+- Use the checked-in examples before authoring a new draft:
+  `references/creative-draft.example.ko.json`
+  and
+  `references/creative-draft.example.en.json`
 
 ## Workstream flow
 
@@ -114,9 +128,37 @@ For all sub-agents by default:
 - `nickname_candidates`: derive from role label or execution class
 - `mcp_servers`: keep minimal; add only when task scope truly needs them
 
-## Per-agent required fields
+## Creative draft subagent fields
 
-When multi-agent is chosen, define each agent with:
+When authoring the creative draft, define each subagent with:
+
+- `slot_id`
+- `role_label`
+- `execution_class`
+- `purpose`
+- `task_title`
+- `selection_rationale`
+- `provider_agent_type`
+- `developer_instructions`
+- `model`
+- `model_reasoning_effort`
+- `sandbox_mode`
+- `mcp_servers`
+- `skills_config`
+- `nickname_candidates`
+- `read_paths`
+- `write_paths`
+- `deny_paths`
+- `operational_constraints`
+- `depends_on`
+
+Do not author the creative draft with normalized agent fields such as
+`agent_id`, `role`, `workstream_id`, `assigned_task_ids`, or
+`reporting_contract`.
+
+## Normalized plan agent fields
+
+After remote normalization and local persistence, agent records can include:
 
 - `agent_id`
 - `role`

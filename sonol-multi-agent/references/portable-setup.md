@@ -74,6 +74,11 @@ Use this checklist when moving Sonol to another computer.
 - Public/community edition planning uses a local AI-authored creative draft plus a hosted normalizer. Standard installs default to `https://agent.zooo.kr/v1/planner/draft`, `https://agent.zooo.kr/v1/planner/ticket`, and `https://agent.zooo.kr/sonol-dashboard/` with no extra planner env needed.
 - Set `SONOL_REMOTE_PLAN_NORMALIZER_URL`, `SONOL_REMOTE_PLAN_NORMALIZER_TICKET_URL`, and optionally `SONOL_REMOTE_PLAN_NORMALIZER_BEARER_TOKEN` only when overriding that public default for a private or self-hosted control-plane.
 - Pass a creative draft with `--creative-draft-file /abs/draft.json` or `SONOL_CREATIVE_DRAFT_FILE=/abs/draft.json`. The hosted service must not author the initial draft on behalf of the local AI session.
+- Author the draft from the canonical contract and examples:
+  `references/creative-draft-contract.md`,
+  `references/creative-draft.example.ko.json`,
+  `references/creative-draft.example.en.json`
+- Sonol now validates the creative draft before planner locks and DB state are mutated, so invalid drafts fail fast without leaving pending planner state behind.
 - Codex CLI and Claude Code differ in adapter/runtime session handling after approval, not in planner backend selection.
 - When using a non-default DB location, pass the same `--workspace-root` and `--db` pair to both `present-proposal.mjs` and `start-dashboard.mjs` so the draft plan, loopback bridge health, and terminal confirmation all resolve to the same authoritative DB.
 - `confirm-plan.mjs` should usually be called with `--workspace-root` and no explicit `--db`. In that mode it can follow the dashboard health response and the plan's `authoritative_db_path` instead of stale local assumptions.
