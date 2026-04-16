@@ -447,6 +447,9 @@ function resolveMainTaskId(plan) {
 
 function summarizeManualLaunch(plan, adapterDispatch, prefix) {
   const candidates = Array.isArray(adapterDispatch?.manifest?.candidates) ? adapterDispatch.manifest.candidates : [];
+  const rootDir = adapterDispatch?.runtime_context?.root_dir ?? null;
+  const manifestFile = rootDir ? `${rootDir}/launch-manifest.json` : null;
+  const authorityFile = rootDir ? `${rootDir}/authority.json` : null;
   const labels = candidates
     .map((candidate) => {
       const promptFile = candidate?.packet?.runtime_prompt_file ?? null;
@@ -455,8 +458,8 @@ function summarizeManualLaunch(plan, adapterDispatch, prefix) {
     .join(" | ");
   return localize(
     plan.preferred_language,
-    `${prefix} 새로운 raw spawn 프롬프트를 쓰지 말고, launch manifest의 run-scoped prompt 파일로 실제 하위 에이전트를 시작하세요.${labels ? ` ${labels}` : ""}`,
-    `${prefix} Do not write a fresh raw spawn prompt. Launch the real sub-agents from the launch manifest using the run-scoped prompt files.${labels ? ` ${labels}` : ""}`
+    `${prefix} 새로운 raw spawn 프롬프트를 쓰지 말고, launch manifest의 run-scoped prompt 파일로 실제 하위 에이전트를 시작하세요.${manifestFile ? ` manifest 파일: ${manifestFile}.` : ""}${authorityFile ? ` authority 파일: ${authorityFile}.` : ""}${labels ? ` ${labels}` : ""}`,
+    `${prefix} Do not write a fresh raw spawn prompt. Launch the real sub-agents from the launch manifest using the run-scoped prompt files.${manifestFile ? ` Manifest file: ${manifestFile}.` : ""}${authorityFile ? ` Authority file: ${authorityFile}.` : ""}${labels ? ` ${labels}` : ""}`
   );
 }
 
@@ -590,6 +593,10 @@ function healthPayload() {
     runtime_root: BINDING.runtime_root,
     workspace_root: WORKSPACE_CONTEXT.workspace_root,
     workspace_id: WORKSPACE_CONTEXT.workspace_id,
+    event_store: {
+      table: "events",
+      compatibility_views: ["runtime_events"]
+    },
     workspace_root_exists: workspaceRootExists,
     binding_valid: bindingValid,
     workspace_state: workspaceState,
@@ -1135,7 +1142,11 @@ const httpServer = createServer(async (request, response) => {
         dashboard_url: DASHBOARD_URL,
         operator_dashboard_url: currentOperatorDashboardUrl(),
         authoritative_db_path: DB_PATH,
-        runtime_root: BINDING.runtime_root
+        runtime_root: BINDING.runtime_root,
+        event_store: {
+          table: "events",
+          compatibility_views: ["runtime_events"]
+        }
       });
       return;
     }

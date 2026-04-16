@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 import { resolve } from "node:path";
-import { resolveSonolBinding } from "../internal/core/sonol-binding-resolver.mjs";
+import { writeDashboardAuthorityArtifacts } from "../internal/core/sonol-authority-artifacts.mjs";
+import { formatAuthorityMismatchMessage, resolveCliAuthoritativeBinding } from "../internal/core/sonol-cli-authority.mjs";
 import { dashboardPortForWorkspace, dashboardUrlForWorkspace } from "../internal/core/sonol-runtime-paths.mjs";
 import { openStore } from "../internal/core/sonol-store.mjs";
 
 const args = {
   workspaceRoot: process.env.SONOL_WORKSPACE_ROOT ?? process.cwd(),
   dbPath: process.env.SONOL_DB_PATH ?? null,
-  dashboardUrl: null
+  dashboardUrl: null,
+  allowDbMismatch: false
 };
-const allowedFlags = new Set(["--workspace-root", "--db", "--dashboard-url"]);
+const allowedFlags = new Set(["--workspace-root", "--db", "--dashboard-url", "--allow-db-mismatch"]);
 let hasExplicitWorkspaceRoot = false;
 let hasExplicitDbPath = false;
 
@@ -78,14 +80,24 @@ for (let index = 2; index < process.argv.length; index += 1) {
     }
     args.dashboardUrl = process.argv[index + 1];
     index += 1;
+  } else if (token === "--allow-db-mismatch") {
+    args.allowDbMismatch = true;
   }
 }
 
-const binding = resolveSonolBinding({
+const authority = await resolveCliAuthoritativeBinding({
   workspaceRoot: hasExplicitWorkspaceRoot ? args.workspaceRoot : null,
   dbPath: hasExplicitDbPath ? args.dbPath : null,
+  dashboardUrl: args.dashboardUrl,
   startDir: process.cwd()
 });
+if (authority.authority_mismatch && !args.allowDbMismatch) {
+  failWithGuidance("AUTHORITATIVE_DB_MISMATCH", formatAuthorityMismatchMessage(authority), {
+    authority_mismatch: authority.authority_mismatch
+  });
+}
+const binding = authority.binding;
+args.dashboardUrl = args.dashboardUrl ?? authority.dashboard_url;
 
 if (hasExplicitWorkspaceRoot) {
   if (binding.workspace_root) {
@@ -132,5 +144,10 @@ bootstrapStore.upsertWorkspaceRegistry?.({
   source: binding.source
 });
 bootstrapStore.close();
+writeDashboardAuthorityArtifacts({
+  binding,
+  dashboardUrl,
+  source: "start-dashboard"
+});
 
 await import("../internal/dashboard/server.mjs");

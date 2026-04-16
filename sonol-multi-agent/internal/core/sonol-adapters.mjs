@@ -1,4 +1,5 @@
 import { appendStructuredLog } from "./sonol-log.mjs";
+import { writeRunAuthorityArtifacts } from "./sonol-authority-artifacts.mjs";
 import { CLAUDE_ADAPTER_BACKEND, CLAUDE_ADAPTER_TYPE, claudeCodeAdapter } from "./sonol-claude-code-adapter.mjs";
 import { CODEX_ADAPTER_BACKEND, CODEX_ADAPTER_TYPE, codexAdapter } from "./sonol-codex-adapter.mjs";
 import { inferAdapterConfigForWorkspace } from "./sonol-provider-session.mjs";
@@ -87,6 +88,7 @@ export function buildAgentPacketForRun(run, plan, agent, options = {}) {
 export function launchRunWithAdapter(store, run, options = {}) {
   const adapter = adapterForRun(run);
   const dispatch = adapter.launch(store, run.run_id, options);
+  writeRunAuthorityArtifacts({ run, dispatch });
   if (dispatch?.runtime_context || dispatch?.provider_refs) {
     const current = store.getRun?.(run.run_id) ?? run;
     try {

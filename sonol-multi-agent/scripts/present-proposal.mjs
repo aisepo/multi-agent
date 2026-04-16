@@ -2,13 +2,14 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { recommendPlanAutonomous } from "../internal/core/sonol-autonomous-planner.mjs";
 import { openStore } from "../internal/core/sonol-store.mjs";
-import { resolveSonolBinding } from "../internal/core/sonol-binding-resolver.mjs";
 import { ensureDashboardReady } from "../internal/core/sonol-dashboard-launcher.mjs";
 import { acquirePlannerLock } from "../internal/core/sonol-planner-lock.mjs";
 import { localize } from "../internal/core/sonol-language.mjs";
 import { resolvePlannerConfig, summarizePlannerConfig, validatePlannerConfig } from "../internal/core/sonol-planner-driver.mjs";
 import { creativeDraftGuidance, loadCreativeDraft } from "../internal/core/sonol-creative-draft.mjs";
 import { ensureDashboardBridgeToken, operatorDashboardUrlForWorkspace } from "../internal/core/sonol-dashboard-bridge.mjs";
+import { writeDashboardAuthorityArtifacts } from "../internal/core/sonol-authority-artifacts.mjs";
+import { formatAuthorityMismatchMessage, resolveCliAuthoritativeBinding } from "../internal/core/sonol-cli-authority.mjs";
 import { dashboardUrlForWorkspace } from "../internal/core/sonol-runtime-paths.mjs";
 import { validateRequestSummaryInput } from "../internal/core/sonol-validation.mjs";
 
@@ -22,7 +23,8 @@ const args = {
   creativeDraftJson: process.env.SONOL_CREATIVE_DRAFT_JSON ?? null,
   save: true,
   workspaceRoot: process.env.SONOL_WORKSPACE_ROOT ? resolve(process.env.SONOL_WORKSPACE_ROOT) : process.cwd(),
-  timeoutMs: 180000
+  timeoutMs: 180000,
+  allowDbMismatch: false
 };
 const positionalArgs = [];
 const allowedFlags = new Set([
@@ -35,7 +37,8 @@ const allowedFlags = new Set([
   "--timeout-ms",
   "--creative-draft-file",
   "--creative-draft-base64",
-  "--creative-draft-json"
+  "--creative-draft-json",
+  "--allow-db-mismatch"
 ]);
 
 function dashboardAttemptLines(language, dashboardState) {
@@ -294,6 +297,8 @@ for (let index = 2; index < process.argv.length; index += 1) {
     index += 1;
   } else if (token === "--no-save") {
     args.save = false;
+  } else if (token === "--allow-db-mismatch") {
+    args.allowDbMismatch = true;
   } else {
     positionalArgs.push(token);
   }
@@ -326,12 +331,19 @@ try {
   }
   throw error;
 }
-const binding = resolveSonolBinding({
+const authority = await resolveCliAuthoritativeBinding({
   workspaceRoot: args.workspaceRoot,
   dbPath: args.dbPath,
+  dashboardUrl: args.dashboardUrl,
   startDir: process.cwd()
 });
-const resolvedDashboardUrl = args.dashboardUrl ?? dashboardUrlForWorkspace({
+if (authority.authority_mismatch && !args.allowDbMismatch) {
+  failWithGuidance("AUTHORITATIVE_DB_MISMATCH", formatAuthorityMismatchMessage(authority), {
+    authority_mismatch: authority.authority_mismatch
+  });
+}
+const binding = authority.binding;
+const resolvedDashboardUrl = args.dashboardUrl ?? authority.dashboard_url ?? dashboardUrlForWorkspace({
   workspaceRoot: binding.workspace_root ?? args.workspaceRoot,
   startDir: binding.workspace_root ?? args.workspaceRoot,
   preferEnv: false
@@ -381,6 +393,11 @@ if (!plannerLock.ok) {
     lock_metadata: plannerLock.metadata ?? null
   });
 }
+writeDashboardAuthorityArtifacts({
+  binding,
+  dashboardUrl: resolvedDashboardUrl,
+  source: "present-proposal"
+});
 
 let plan = null;
 let deferredGuidance = null;

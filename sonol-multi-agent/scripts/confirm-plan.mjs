@@ -1,13 +1,12 @@
 #!/usr/bin/env node
-import http from "node:http";
-import https from "node:https";
 import { resolve } from "node:path";
 import { defaultAdapterConfig, launchRunWithAdapter, requireAdapter } from "../internal/core/sonol-adapters.mjs";
+import { writeDashboardAuthorityArtifacts } from "../internal/core/sonol-authority-artifacts.mjs";
+import { formatAuthorityMismatchMessage, resolveCliAuthoritativeBinding } from "../internal/core/sonol-cli-authority.mjs";
 import { appendStructuredLog } from "../internal/core/sonol-log.mjs";
 import { localize } from "../internal/core/sonol-language.mjs";
 import { createRunSnapshot } from "../internal/core/sonol-run-snapshot.mjs";
 import { hasExplicitAdapterConfigEnv, resolveAutoAdapterConfig, resolveMainProviderSessionIdentity } from "../internal/core/sonol-provider-session.mjs";
-import { dashboardUrlForWorkspace } from "../internal/core/sonol-runtime-paths.mjs";
 import { openStore } from "../internal/core/sonol-store.mjs";
 import { resolveSonolBinding } from "../internal/core/sonol-binding-resolver.mjs";
 import { isStructurallyMultiAgentPlan, validatePlan, validatePlanForAdapter } from "../internal/core/sonol-validation.mjs";
@@ -20,41 +19,9 @@ const args = {
   adapterType: adapterDefaults.adapter_type,
   adapterBackend: adapterDefaults.adapter_backend,
   workspaceRoot: process.env.SONOL_WORKSPACE_ROOT ? resolve(process.env.SONOL_WORKSPACE_ROOT) : process.cwd(),
-  dashboardUrl: null
+  dashboardUrl: null,
+  allowDbMismatch: false
 };
-
-function readJson(url, timeoutMs = 1200) {
-  return new Promise((resolvePromise) => {
-    let parsed;
-    try {
-      parsed = new URL(url);
-    } catch {
-      resolvePromise(null);
-      return;
-    }
-    const transport = parsed.protocol === "https:" ? https : http;
-    const request = transport.request(parsed, { method: "GET", timeout: timeoutMs }, (response) => {
-      let raw = "";
-      response.setEncoding("utf8");
-      response.on("data", (chunk) => {
-        raw += chunk;
-      });
-      response.on("end", () => {
-        try {
-          resolvePromise(JSON.parse(raw));
-        } catch {
-          resolvePromise(null);
-        }
-      });
-    });
-    request.on("timeout", () => {
-      request.destroy();
-      resolvePromise(null);
-    });
-    request.on("error", () => resolvePromise(null));
-    request.end();
-  });
-}
 
 let adapterExplicitFromCli = false;
 for (let index = 2; index < process.argv.length; index += 1) {
@@ -85,6 +52,8 @@ for (let index = 2; index < process.argv.length; index += 1) {
   } else if (token === "--dashboard-url") {
     args.dashboardUrl = process.argv[index + 1];
     index += 1;
+  } else if (token === "--allow-db-mismatch") {
+    args.allowDbMismatch = true;
   }
 }
 
@@ -97,32 +66,23 @@ const effectiveAdapter = resolveAutoAdapterConfig({
 args.adapterType = effectiveAdapter.adapter_type;
 args.adapterBackend = effectiveAdapter.adapter_backend;
 
-let binding = resolveSonolBinding({
+const authority = await resolveCliAuthoritativeBinding({
   workspaceRoot: args.workspaceRoot,
   dbPath: args.dbPath,
+  dashboardUrl: args.dashboardUrl,
   startDir: process.cwd()
 });
-args.dashboardUrl ??= dashboardUrlForWorkspace({
-  workspaceRoot: binding.workspace_root ?? args.workspaceRoot,
-  startDir: binding.workspace_root ?? args.workspaceRoot,
-  preferEnv: false
-});
-if (!args.dbPath) {
-  const health = await readJson(new URL("/api/health", args.dashboardUrl).toString());
-  if (
-    health?.ok
-    && String(health.workspace_root ?? "") === String(binding.workspace_root ?? args.workspaceRoot)
-    && typeof health.authoritative_db_path === "string"
-    && health.authoritative_db_path
-    && health.authoritative_db_path !== binding.db_path
-  ) {
-    binding = resolveSonolBinding({
-      workspaceRoot: args.workspaceRoot,
-      dbPath: health.authoritative_db_path,
-      startDir: process.cwd()
-    });
-  }
+if (authority.authority_mismatch && !args.allowDbMismatch) {
+  console.error(formatAuthorityMismatchMessage(authority));
+  process.exit(1);
 }
+let binding = authority.binding;
+args.dashboardUrl = authority.dashboard_url;
+writeDashboardAuthorityArtifacts({
+  binding,
+  dashboardUrl: args.dashboardUrl,
+  source: "confirm-plan"
+});
 
 let store = openStore(binding.db_path, {
   workspaceRoot: binding.workspace_root ?? args.workspaceRoot,
@@ -160,6 +120,9 @@ function resolveMainTaskId(plan) {
 
 function summarizeManualLaunch(run, adapterDispatch, language) {
   const candidates = Array.isArray(adapterDispatch?.manifest?.candidates) ? adapterDispatch.manifest.candidates : [];
+  const rootDir = adapterDispatch?.runtime_context?.root_dir ?? null;
+  const manifestFile = rootDir ? `${rootDir}/launch-manifest.json` : null;
+  const authorityFile = rootDir ? `${rootDir}/authority.json` : null;
   const labels = candidates
     .map((candidate) => {
       const promptFile = candidate?.packet?.runtime_prompt_file ?? null;
@@ -168,8 +131,8 @@ function summarizeManualLaunch(run, adapterDispatch, language) {
     .join(" | ");
   return localize(
     language,
-    `이 실행은 manifest만 준비되었습니다. 일반 spawn_agent 프롬프트를 새로 쓰지 말고, launch manifest의 run-scoped prompt 파일로 실제 하위 에이전트를 시작하세요.${labels ? ` ${labels}` : ""}`,
-    `This run is only prepared. Do not write a fresh raw spawn_agent prompt. Launch the real sub-agents from the launch manifest using the run-scoped prompt files.${labels ? ` ${labels}` : ""}`
+    `이 실행은 manifest만 준비되었습니다. 일반 spawn_agent 프롬프트를 새로 쓰지 말고, launch manifest의 run-scoped prompt 파일로 실제 하위 에이전트를 시작하세요.${manifestFile ? ` manifest 파일: ${manifestFile}.` : ""}${authorityFile ? ` authority 파일: ${authorityFile}.` : ""}${labels ? ` ${labels}` : ""}`,
+    `This run is only prepared. Do not write a fresh raw spawn_agent prompt. Launch the real sub-agents from the launch manifest using the run-scoped prompt files.${manifestFile ? ` Manifest file: ${manifestFile}.` : ""}${authorityFile ? ` Authority file: ${authorityFile}.` : ""}${labels ? ` ${labels}` : ""}`
   );
 }
 function canConfirmPlanCandidate(store, plan) {
@@ -211,7 +174,7 @@ if (!args.planId) {
 if (!args.planId) {
   const messageLanguage = args.language ?? "ko";
   console.error(localize(messageLanguage, "대시보드에서 승인된 최신 구성을 찾지 못했습니다. 먼저 대시보드에서 구성을 승인해 주세요.", "Could not find the latest approved dashboard plan. Approve a plan in the dashboard first."));
-  console.error("Usage: node confirm-plan.mjs [--plan-id <plan_id>] [--mode dry-run|mock|live] [--adapter-type <type>] [--adapter-backend <backend>] [--language ko|en] [--workspace-root <workspace_root>] [--db <path>] [--dashboard-url <url>]");
+  console.error("Usage: node confirm-plan.mjs [--plan-id <plan_id>] [--mode dry-run|mock|live] [--adapter-type <type>] [--adapter-backend <backend>] [--language ko|en] [--workspace-root <workspace_root>] [--db <path>] [--dashboard-url <url>] [--allow-db-mismatch]");
   console.error(localize(messageLanguage, "보통은 --workspace-root 만 넘기고 --db 는 생략하세요. 그러면 대시보드 health 와 plan.authoritative_db_path 를 따라 최신 바인딩으로 재해석합니다.", "Usually pass --workspace-root and omit --db. Then confirm-plan can follow dashboard health and plan.authoritative_db_path to rebind to the latest authority."));
   process.exit(1);
 }
@@ -232,6 +195,11 @@ if (
     workspaceRoot: binding.workspace_root ?? args.workspaceRoot,
     startDir: binding.workspace_root ?? args.workspaceRoot,
     runtimeRoot: binding.runtime_root
+  });
+  writeDashboardAuthorityArtifacts({
+    binding,
+    dashboardUrl: args.dashboardUrl,
+    source: "confirm-plan-rebind"
   });
   plan = store.getPlan(args.planId);
 }

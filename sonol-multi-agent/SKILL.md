@@ -310,8 +310,13 @@ In this mode:
 - Retry creates a new run; it does not overwrite the previous one.
 - Runtime state must be reported through the runtime helper skill scripts.
 - SQLite is the system of record for plans, runs, and events.
+- The canonical SQLite event table is `events`. A compatibility view named
+  `runtime_events` may exist for older diagnostics, but new tooling should
+  prefer the Sonol APIs and current table name.
 - `prepared` in a manifest-only adapter means “launch packet ready, provider
   subagents not launched yet”.
+- A manifest-only `prepared` run should already appear in the dashboard with
+  persisted run/session state before any sub-agent progress arrives.
 - `provider_refs` must describe what Sonol actually knows from the provider
   surface. If launch is manifest-only and status is projected from local
   runtime events, record that honestly instead of implying provider-native
@@ -373,8 +378,11 @@ In this mode:
   - `node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/confirm-plan.mjs --workspace-root /abs/workspace`
   - Claude Code override: `node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/confirm-plan.mjs --workspace-root /abs/workspace --adapter-type claude-code-subagent --adapter-backend claude-code-manual`
   - Optional explicit binding: `node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/confirm-plan.mjs --workspace-root /abs/workspace --db /abs/sonol.sqlite --dashboard-url http://127.0.0.1:18081`
+- Show the authoritative workspace binding before ad-hoc diagnostics:
+  - `node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/show-authority.mjs --workspace-root /abs/workspace`
 - Show the launch manifest prepared by the active adapter:
   - `node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/show-run-launch-manifest.mjs --run-id <run_id> --db <db_path>`
+  - A prepared manifest-only run may also persist `<runtime_root>/<run_id>/launch-manifest.json` and `<runtime_root>/<run_id>/authority.json` for operator diagnostics.
 - Create a run directly only for single-agent or internal testing paths:
   - `node $SONOL_INSTALL_ROOT/skills/sonol-multi-agent/scripts/create-run.mjs --plan-id <plan_id> --mode dry-run --db <db_path>`
 - Build a sub-agent prompt packet:

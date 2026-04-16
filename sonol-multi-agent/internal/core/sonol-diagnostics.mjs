@@ -98,8 +98,15 @@ export function collectRunDiagnostics(store, runId, { logLimit = 60 } = {}) {
   });
 
   const issues = [];
+  const notes = [];
   if (["queued", "running", "blocked"].includes(run.status) && events.length === 0) {
     issues.push("run_has_no_events");
+  }
+  if (run.status === "prepared" && run.provider_refs?.dispatch_mode === "manifest_only") {
+    notes.push("prepared_manifest_only_run_waiting_for_manual_subagent_launch");
+  }
+  if (run.status === "prepared" && events.length > 0) {
+    notes.push("prepared_run_already_has_persisted_system_events");
   }
 
   const agentsMissingReports = agents.filter((agent) => agent.event_count === 0).map((agent) => agent.agent_id);
@@ -120,13 +127,23 @@ export function collectRunDiagnostics(store, runId, { logLimit = 60 } = {}) {
     plan_id: run.plan_id,
     plan_title: plan?.plan_title ?? null,
     run_status: run.status,
+    dispatch_mode: run.provider_refs?.dispatch_mode ?? null,
+    launch_truth_source: run.provider_refs?.launch_truth_source ?? null,
+    status_truth_source: run.provider_refs?.status_truth_source ?? null,
     event_count: events.length,
     latest_event_id: events.at(-1)?.payload?.event_id ?? null,
     latest_event_type: events.at(-1)?.event_type ?? null,
+    authoritative_db_path: snapshot.db_path ?? null,
+    runtime_bindings: run.runtime_bindings ?? null,
+    event_store: {
+      table: "events",
+      compatibility_views: ["runtime_events"]
+    },
     adapter_status: adapterStatus,
     monitor,
     agents,
     issues,
+    notes,
     recent_logs: listStructuredLogs("sonol-runtime", { runId, limit: logLimit })
   };
 }

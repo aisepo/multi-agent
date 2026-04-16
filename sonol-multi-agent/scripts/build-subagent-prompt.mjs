@@ -2,11 +2,14 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { buildAgentPacketForRun, prepareRunContextForRun } from "../internal/core/sonol-adapters.mjs";
-import { defaultDbPath, openStore } from "../internal/core/sonol-store.mjs";
+import { formatAuthorityMismatchMessage, resolveCliAuthoritativeBinding } from "../internal/core/sonol-cli-authority.mjs";
+import { openStore } from "../internal/core/sonol-store.mjs";
 
 const args = {
   dbPath: null,
-  workspaceRoot: process.env.SONOL_WORKSPACE_ROOT ? resolve(process.env.SONOL_WORKSPACE_ROOT) : process.cwd()
+  workspaceRoot: process.env.SONOL_WORKSPACE_ROOT ? resolve(process.env.SONOL_WORKSPACE_ROOT) : process.cwd(),
+  dashboardUrl: null,
+  allowDbMismatch: false
 };
 
 for (let index = 2; index < process.argv.length; index += 1) {
@@ -26,16 +29,33 @@ for (let index = 2; index < process.argv.length; index += 1) {
   } else if (token === "--format") {
     args.format = process.argv[index + 1];
     index += 1;
+  } else if (token === "--dashboard-url") {
+    args.dashboardUrl = process.argv[index + 1];
+    index += 1;
+  } else if (token === "--allow-db-mismatch") {
+    args.allowDbMismatch = true;
   }
 }
 
 if (!args.runId || !args.agentId) {
-  console.error("Usage: node build-subagent-prompt.mjs --run-id <run_id> --agent-id <agent_id> [--workspace-root <workspace_root>] [--db path]");
+  console.error("Usage: node build-subagent-prompt.mjs --run-id <run_id> --agent-id <agent_id> [--workspace-root <workspace_root>] [--db path] [--dashboard-url <url>] [--allow-db-mismatch]");
   process.exit(1);
 }
 
-args.dbPath ??= defaultDbPath({ workspaceRoot: args.workspaceRoot, startDir: args.workspaceRoot });
-const store = openStore(args.dbPath, { workspaceRoot: args.workspaceRoot, startDir: args.workspaceRoot });
+const authority = await resolveCliAuthoritativeBinding({
+  workspaceRoot: args.workspaceRoot,
+  dbPath: args.dbPath,
+  dashboardUrl: args.dashboardUrl,
+  startDir: args.workspaceRoot
+});
+if (authority.authority_mismatch && !args.allowDbMismatch) {
+  console.error(formatAuthorityMismatchMessage(authority));
+  process.exit(1);
+}
+const store = openStore(authority.binding.db_path, {
+  workspaceRoot: authority.binding.workspace_root ?? args.workspaceRoot,
+  startDir: authority.binding.workspace_root ?? args.workspaceRoot
+});
 const run = store.getRun(args.runId);
 if (!run) {
   console.error(`Run not found: ${args.runId}`);

@@ -36,6 +36,10 @@ plans, approvals, runs, and runtime events.
   loopback bridge and the current Sonol terminal session, so it must not be
   treated as a cross-computer permanent link.
 - The dashboard health and snapshot surfaces expose `dashboard_url`, `authoritative_db_path`, and `workspace_root`. Use those fields to verify that the browser and terminal are looking at the same workspace state.
+- Sonol also writes workspace-local authority metadata to
+  `<workspace_root>/.sonol/authority.json` and runtime authority metadata to
+  `<runtime_root>/dashboard/authority.json`. Operator CLI diagnostics should use
+  those authority records before falling back to heuristic DB discovery.
 - The browser may cache static assets, but it is not allowed to become the
   source of truth for orchestration state. The bridge-backed SQLite snapshot is
   authoritative.
@@ -54,6 +58,12 @@ plans, approvals, runs, and runtime events.
 - The run-scoped prompt under `<runtime_root>/<run_id>/prompts/...` is the authority for an active run.
 - Runtime guidance should be read from the run-scoped prompt under `<runtime_root>/<run_id>/prompts/<agent_id>.txt`.
 - Active run state must come from the DB-backed event stream.
+- In a manifest-only adapter, a `prepared` run should still show run/session
+  state in the dashboard before any real sub-agent progress arrives. “No
+  sub-agent report yet” is not the same as “the dashboard has no state”.
+- The canonical SQLite event table is `events`. A compatibility view named
+  `runtime_events` may exist for older diagnostics, but new tooling should
+  prefer the official APIs and the `events` table semantics.
 - The remote dashboard mirror is not authoritative without the local SQLite bridge.
 - The dashboard may edit supported sub-agent controls, but only within the
   current adapter control surface and Sonol-local governance fields.
@@ -84,6 +94,9 @@ The dashboard may not:
 
 - use dashboard approval plus explicit terminal confirmation
 - use dashboard visibility plus runtime events instead of direct agent control
+- use `show-authority.mjs` first when DB/workspace identity is in doubt
+- use `show-run-launch-manifest.mjs` or `/api/runs/<run_id>/launch-manifest`
+  before assuming a disk `launch-manifest.json` is required
 - use `/agent` or normal main-thread follow-up for human steering when a sub-agent must be redirected
 - The dashboard must not assume it can inject text into an existing
   terminal session.

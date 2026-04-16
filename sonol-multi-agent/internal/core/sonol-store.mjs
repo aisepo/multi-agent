@@ -937,6 +937,17 @@ export function openStoreWithOptions(dbPath = resolveDefaultDbPath(), options = 
       CREATE INDEX IF NOT EXISTS idx_events_run_created ON events(run_id, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_events_plan_json ON events(json_extract(payload_json, '$.plan_id'));
+      CREATE VIEW IF NOT EXISTS runtime_events AS
+      SELECT
+        event_id,
+        run_id,
+        agent_id,
+        event_type,
+        state,
+        message,
+        payload_json,
+        created_at
+      FROM events;
       CREATE INDEX IF NOT EXISTS idx_audit_ref_created ON audit_log(ref_id, created_at DESC);
       CREATE UNIQUE INDEX IF NOT EXISTS idx_plan_revisions_unique ON plan_revisions(plan_id, context_version);
       CREATE INDEX IF NOT EXISTS idx_plan_revisions_saved_at ON plan_revisions(saved_at DESC);
