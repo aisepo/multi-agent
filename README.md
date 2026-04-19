@@ -7,6 +7,14 @@ This repository contains the public release of two Sonol skills:
 
 Both skills must be installed together. Installing only one of them can break the orchestration flow, runtime reporting, or dashboard/runtime integration.
 
+## Creator
+
+This project is created by [Source Playground](https://www.youtube.com/@sourcePlayground).
+
+## Usage Example Video
+
+- [Sonol Multi-Agent usage example](https://youtu.be/ke5bSL2LWb0?si=xYdgDFbRzpdLmoFx)
+
 ## Repository Layout
 
 ```text

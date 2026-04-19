@@ -7,6 +7,14 @@
 
 이 저장소를 사용하려면 위 두 스킬을 반드시 함께 설치해야 합니다. 둘 중 하나만 설치하면 실행 흐름, 런타임 보고, 대시보드 연동이 서로 맞지 않을 수 있습니다.
 
+## 제작자
+
+이 프로젝트의 제작자는 [소스놀이터](https://www.youtube.com/@sourcePlayground)입니다.
+
+## 사용법 예시 영상
+
+- [Sonol Multi-Agent 사용 예시 영상](https://youtu.be/ke5bSL2LWb0?si=xYdgDFbRzpdLmoFx)
+
 ## 저장소 구성
 
 ```text
