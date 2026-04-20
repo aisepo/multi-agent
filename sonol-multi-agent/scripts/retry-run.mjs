@@ -5,6 +5,7 @@ import { createRunSnapshot } from "../internal/core/sonol-run-snapshot.mjs";
 import { resolveMainProviderSessionIdentity } from "../internal/core/sonol-provider-session.mjs";
 import { defaultDbPath, openStore } from "../internal/core/sonol-store.mjs";
 import { isStructurallyMultiAgentPlan } from "../internal/core/sonol-validation.mjs";
+import { localize } from "../internal/core/sonol-language.mjs";
 
 const args = {
   dbPath: null,
@@ -84,7 +85,11 @@ if (!plan) {
 }
 
 if (isStructurallyMultiAgentPlan(plan)) {
-  console.error("Multi-agent retry is disabled. Re-approve the plan in the dashboard, then type `승인` in the current Sonol terminal session.");
+  console.error(localize(
+    plan.preferred_language,
+    "멀티 에이전트 재시도는 비활성화되어 있습니다. 대시보드에서 구성을 다시 승인한 뒤, 현재 Sonol 터미널 세션에서 `승인`을 입력하세요.",
+    "Multi-agent retry is disabled. Re-approve the plan in the dashboard, then type `승인` in the current Sonol terminal session."
+  ));
   process.exit(1);
 }
 

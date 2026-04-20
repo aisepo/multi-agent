@@ -5,6 +5,7 @@ import { createRunSnapshot } from "../internal/core/sonol-run-snapshot.mjs";
 import { hasExplicitAdapterConfigEnv, resolveAutoAdapterConfig, resolveMainProviderSessionIdentity } from "../internal/core/sonol-provider-session.mjs";
 import { defaultDbPath, openStore } from "../internal/core/sonol-store.mjs";
 import { isStructurallyMultiAgentPlan, validatePlanForAdapter } from "../internal/core/sonol-validation.mjs";
+import { localize } from "../internal/core/sonol-language.mjs";
 
 const adapterDefaults = defaultAdapterConfig();
 const adapterExplicitFromEnv = hasExplicitAdapterConfigEnv();
@@ -104,7 +105,11 @@ if (!plan) {
 }
 
 if (isStructurallyMultiAgentPlan(plan)) {
-  console.error("Use confirm-plan.mjs for multi-agent launches so terminal confirmation remains the single launch authority.");
+  console.error(localize(
+    plan.preferred_language,
+    "멀티 에이전트 실행은 confirm-plan.mjs 를 사용하세요. 터미널 확정이 유일한 실행 권한 경로여야 합니다.",
+    "Use confirm-plan.mjs for multi-agent launches so terminal confirmation remains the single launch authority."
+  ));
   process.exit(1);
 }
 
@@ -115,7 +120,11 @@ const adapterValidation = validatePlanForAdapter(plan, {
   adapter_backend: args.adapterBackend
 });
 if (!adapterValidation.valid) {
-  console.error("The plan execution target does not match the selected adapter.");
+  console.error(localize(
+    plan.preferred_language,
+    "계획의 실행 대상이 선택된 adapter와 일치하지 않습니다.",
+    "The plan execution target does not match the selected adapter."
+  ));
   for (const issue of adapterValidation.errors) {
     console.error(`- ${issue.message}`);
   }
